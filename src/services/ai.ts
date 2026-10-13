@@ -34,7 +34,7 @@ export async function createStudyPack(source: string, filename: string, question
   const counts = { easy: perDifficulty, medium: perDifficulty, hard: perDifficulty };
   const allQuestions: z.infer<typeof QuestionSchema>[] = [];
   const QuestionBatchSchema = z.object({ questions: z.array(QuestionSchema) });
-  for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+  await Promise.all((['easy', 'medium', 'hard'] as const).map(async difficulty => {
     let remaining = counts[difficulty];
     while (remaining > 0) {
       const batchSize = Math.min(8, remaining);
@@ -76,7 +76,7 @@ export async function createStudyPack(source: string, filename: string, question
         break;
       }
     }
-  }
+  }));
   const seen = new Set<string>();
   const questions = allQuestions.filter(q => {
     const key = q.question.toLowerCase().replace(/\W/g, '');
