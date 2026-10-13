@@ -16,7 +16,8 @@ export async function deleteCallback(ctx: Context) { const data = ctx.callbackQu
 export async function adminCommand(ctx: Context) {
   if (!ctx.from) return;
   if (!env.adminIds.includes(String(ctx.from.id))) { await ctx.reply('Access denied.'); return; }
-  const messageText = ctx.message && 'text' in ctx.message && typeof ctx.message.text === 'string' ? ctx.message.text : '';\n  const parts = messageText.split(/\s+/);
+  const messageText = ctx.message && 'text' in ctx.message && typeof ctx.message.text === 'string' ? ctx.message.text : '';
+  const parts = messageText.split(/\s+/);
   const action = parts[1];
   const telegramUserId = parts[2];
   const planId = parts[3];
