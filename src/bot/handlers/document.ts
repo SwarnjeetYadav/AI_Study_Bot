@@ -30,13 +30,21 @@ export async function documentHandler(ctx: Context) {
     }
     fileId = file.file_id;
     fileSize = file.file_size;
-  } else if ('photo' in message && message.photo?.length) {
-    const photo = message.photo[message.photo.length - 1];
-    fileId = photo.file_id;
-    name = `image-${Date.now()}.jpg`;
-    mimeType = 'image/jpeg';
-    fileSize = photo.file_size;
-  } else {
+  
+} else if ('photo' in message && message.photo?.length) {
+  const photo = message.photo[message.photo.length - 1];
+
+  if (!photo) {
+    await ctx.reply('I could not read that image. Please upload it again.');
+    return;
+  }
+
+  fileId = photo.file_id;
+  name = `image-${Date.now()}.jpg`;
+  mimeType = 'image/jpeg';
+  fileSize = photo.file_size;
+}
+ else {
     return;
   }
 
