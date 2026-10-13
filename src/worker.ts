@@ -40,7 +40,7 @@ async function processDocument(jobId: string) {
     if (words > env.maxWords) throw new Error('WORD_LIMIT_EXCEEDED');
     doc.pageCount = extracted.pageCount; doc.extractedWords = words; doc.status = 'generating'; await doc.save();
     await updateProgress(jobId, 'generating', 45, 'Creating structured notes and questions.');
-    const pack = await createStudyPack(text, doc.originalName, plan.questionsPerDocument);
+    const pack = await createStudyPack(text, doc.originalName, plan.questionsPerDifficulty);
     await updateProgress(jobId, 'validating', 70, 'Checking answer options and source evidence.');
     const qset = await QuestionSet.create({ documentId: doc._id, questions: pack.questions, validationStatus: 'passed', version: 1 });
     doc.summary = pack.summary; doc.questionSetId = qset._id; doc.status = 'completed'; await doc.save();
@@ -55,7 +55,7 @@ async function processDocument(jobId: string) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR'; const code = message.startsWith('AI_OUTPUT_INVALID') ? 'AI_OUTPUT_INVALID' : message;
     await StudyDocument.findByIdAndUpdate(doc._id, { status: 'failed', errorCode: code }); await ProcessingJob.findOneAndUpdate({ jobId }, { status: 'failed', stage: 'failed', errorCode: code });
-    const userMessage = code === 'INSUFFICIENT_TEXT' ? 'I could not extract enough selectable text. This may be a scanned PDF; OCR is not configured in this MVP.' : code === 'PAGE_LIMIT_EXCEEDED' ? `This document exceeds your plan's page limit (${plan.pagesPerDocument}). Use /plans or upload fewer pages.` : code === 'WORD_LIMIT_EXCEEDED' ? 'This document exceeds the configured extracted-text limit. Please upload a shorter document.' : 'Processing failed temporarily. Your document credit will be released. Please try again with a clearer PDF/DOCX.';
+    const userMessage = code === 'INSUFFICIENT_TEXT' ? 'I could not extract enough readable text. Please upload a clearer image/document or a PDF with selectable text.' : code === 'PAGE_LIMIT_EXCEEDED' ? `This document exceeds your plan's page limit (${plan.pagesPerDocument}). Use /plans or upload fewer pages.` : code === 'WORD_LIMIT_EXCEEDED' ? 'This document exceeds the configured extracted-text limit. Please upload a shorter document.' : 'Processing failed temporarily. Your document credit will be released. Please try again with a clearer PDF/DOCX.';
     await getBot().api.sendMessage(job.chatId, userMessage);
     throw error;
   } finally {
