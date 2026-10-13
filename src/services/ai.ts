@@ -24,14 +24,14 @@ export async function createSummary(source: string, filename: string): Promise<S
   ));
   const notes = sectionNotes.join('\n');
   const summaryPrompt = `Create a structured study summary grounded ONLY in the source and notes below. Return JSON: {"summary":{"title":"...","overview":"...","sections":[{"heading":"...","keyPoints":["..."]}],"keyTerms":[{"term":"...","definition":"..."}],"revisionPoints":["..."]}}. Preserve the full document's major topics, important definitions, formulas and dates. Do not invent content. NOTES:\n${notes}\nSOURCE (authoritative):\n${source.slice(0, 90000)}`;
-  const summaryJson = JSON.parse(await ask(summaryPrompt, 5000));
+  const summaryJson = suppliedSummary ? { summary: suppliedSummary } : JSON.parse(await ask(summaryPrompt, 5000));
   const SummaryOnlySchema = z.object({ summary: StudyPackSchema.shape.summary });
   const parsedSummary = SummaryOnlySchema.safeParse(summaryJson);
   if (!parsedSummary.success) throw new Error(`AI_SUMMARY_INVALID: ${parsedSummary.error.issues.slice(0, 3).map(i => i.message).join('; ')}`);
   return parsedSummary.data.summary;
 }
 
-export async function createStudyPack(source: string, filename: string, questionsPerDifficulty: number): Promise<StudyPack> {
+export async function createStudyPack(source: string, filename: string, questionsPerDifficulty: number, suppliedSummary?: StudyPack['summary']): Promise<StudyPack> {
   const parts = chunks(source);
   // Summarize chunks concurrently to avoid waiting for one model call per chunk.
   const sectionNotes = await Promise.all(parts.map((part, i) =>
@@ -106,5 +106,5 @@ export async function createStudyPack(source: string, filename: string, question
   // IDs from AI responses may restart at q_001 in every batch. Make every stored
   // question ID unique so Telegram quiz callbacks always resolve the intended item.
   const questionsWithUniqueIds = questions.map((q, index) => ({ ...q, id: `${q.difficulty}_${String(index + 1).padStart(3, '0')}` }));
-  return { summary: parsedSummary.data.summary, questions: questionsWithUniqueIds };
+  return { summary: suppliedSummary ?? parsedSummary.data.summary, questions: questionsWithUniqueIds };
 }
