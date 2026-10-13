@@ -6,7 +6,12 @@ import { startHandler, upsertUser } from './bot/handlers/start';
 import { documentHandler } from './bot/handlers/document';
 import { quizCallback, beginQuiz } from './bot/handlers/quiz';
 import { adminCommand, deleteCallback, deleteCommand, help, history, menuCallback, privacy, showPlans, status, terms } from './bot/handlers/commands';
-import { StudyDocument } from './models';
+import { StudyDocument, QuestionSet, User } from './models';
+import { renderStudyPdf } from './services/pdf';
+import { InputFile } from 'grammy';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
 
 async function main() {
   await mongoose.connect(env.mongoUri());
@@ -46,6 +51,22 @@ async function main() {
     }
     await ctx.answerCallbackQuery();
     await beginQuiz(ctx, match[1], match[2]);
+  });
+  bot.callbackQuery(/^fullpdf:/, async ctx => {
+    const data = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : '';
+    const documentId = data.split(':')[1];
+    if (!ctx.from || !ctx.chat || !documentId) { await ctx.answerCallbackQuery({ text: 'Invalid PDF request.' }); return; }
+    const user = await User.findOne({ telegramUserId: String(ctx.from.id) });
+    const doc = await StudyDocument.findById(documentId);
+    if (!user || !doc || String(doc.userId) !== String(user._id)) { await ctx.answerCallbackQuery({ text: 'Study pack not found.' }); return; }
+    const set = await QuestionSet.findOne({ documentId }).sort({ createdAt: -1 });
+    if (!set || !doc.summary) { await ctx.answerCallbackQuery({ text: 'Question PDF is still being generated. Please try again shortly.' }); return; }
+    await ctx.answerCallbackQuery({ text: 'Preparing your question PDF.' });
+    const out = path.join(env.tempDir, `questions-${crypto.randomUUID()}.pdf`);
+    try {
+      await renderStudyPdf({ summary: doc.summary, questions: set.questions } as any, doc.originalName, out);
+      await ctx.api.sendDocument(ctx.chat.id, new InputFile(out, `${path.parse(doc.originalName).name}-question-set.pdf`), { caption: 'Complete question set with answers and explanations.' });
+    } finally { await fs.rm(out, { force: true }).catch(() => {}); }
   });
   bot.callbackQuery(/^quiz:/, quizCallback);
   bot.callbackQuery(/^delete:/, deleteCallback);
