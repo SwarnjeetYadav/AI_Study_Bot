@@ -45,15 +45,29 @@ async function processDocument(jobId: string) {
     const summaryMessage = `📘 ${summaryData.title}\n\n${summaryData.overview}\n\n${summaryData.sections.map(s=>`▪️ ${s.heading}\n${s.keyPoints.map(p=>`• ${p}`).join('\n')}`).join('\n\n')}\n\n🔑 Key terms\n${summaryData.keyTerms.slice(0,15).map(t=>`• ${t.term}: ${t.definition}`).join('\n')}\n\n⚡ Quick revision\n${summaryData.revisionPoints.map(p=>`• ${p}`).join('\n')}`;
     await sendLongMessage(job.chatId, summaryMessage);
     const keyboard = new InlineKeyboard().text('Easy Quiz', `difficulty:${doc._id}:easy`).text('Medium Quiz', `difficulty:${doc._id}:medium`).row().text('Hard Quiz', `difficulty:${doc._id}:hard`).text('Full Question Set PDF', `fullpdf:${doc._id}`).row().text('End study session', 'mode:end');
-    await getBot().api.sendMessage(job.chatId, '✅ Summary ready. Questions are being prepared in the background. Quiz buttons will work when generation finishes; you can request the full question PDF here.', { reply_markup: keyboard });
+    await getBot().api.sendMessage(job.chatId, '📖 Please read your summary while I prepare your practice questions. I’m generating a balanced mix of Easy, Medium and Hard questions in the background. I’ll update the progress here; this may take a little while depending on document length.', { reply_markup: keyboard });
+    const progressMessage = await getBot().api.sendMessage(job.chatId, '⏳ Question set progress: 0%\nPreparing Easy, Medium and Hard questions…');
     await updateProgress(jobId, 'generating questions', 50, 'Building Easy, Medium and Hard question sets.');
-    const pack = await createStudyPack(text, doc.originalName, plan.questionsPerDifficulty, summaryData);
-    await updateProgress(jobId, 'validating', 72, 'Checking answer options and source evidence.');
+    const pack = await createStudyPack(text, doc.originalName, plan.questionsPerDifficulty, summaryData, async (completed, total, difficulty) => {
+      const percent = Math.min(78, 50 + Math.round((completed / total) * 28));
+      await updateProgress(jobId, 'generating questions', percent, `Finished the ${difficulty} batch. Preparing the remaining difficulty levels.`);
+      try {
+        await getBot().api.editMessageText(job.chatId, progressMessage.message_id, `⏳ Question set progress: ${Math.round((completed / total) * 75)}%\nCompleted ${completed} of ${total} difficulty batches. Working on the remaining questions…`);
+      } catch { /* Ignore unchanged or already-edited progress messages. */ }
+    });
+    await updateProgress(jobId, 'validating', 82, 'Checking answer options and source evidence.');
     const qset = await QuestionSet.create({ documentId: doc._id, questions: pack.questions, validationStatus: 'passed', version: 1 });
     doc.questionSetId = qset._id; doc.status = 'completed'; await doc.save();
-    await updateProgress(jobId, 'rendering', 82, 'Rendering the complete question PDF.'); await renderStudyPdf(pack, doc.originalName, pdfPath);
-    await updateProgress(jobId, 'delivering', 94, 'Sending the question PDF.');
-    await getBot().api.sendDocument(job.chatId, new (await import('grammy')).InputFile(pdfPath, `${path.parse(doc.originalName).name}-study-pack.pdf`), { caption: `📄 Full question set ready: ${pack.questions.length} questions with answer explanations. Use the buttons above to start a quiz.` });
+    await updateProgress(jobId, 'rendering', 90, 'Rendering the complete mixed-difficulty question PDF.');
+    const mixedPack = { ...pack, questions: [...pack.questions] };
+    for (let i = mixedPack.questions.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(i + 1);
+      [mixedPack.questions[i], mixedPack.questions[j]] = [mixedPack.questions[j]!, mixedPack.questions[i]!];
+    }
+    await renderStudyPdf(mixedPack, doc.originalName, pdfPath);
+    await updateProgress(jobId, 'delivering', 96, 'Sending the question PDF.');
+    await getBot().api.sendDocument(job.chatId, new (await import('grammy')).InputFile(pdfPath, `${path.parse(doc.originalName).name}-study-pack.pdf`), { caption: `📄 Full mixed question set ready: ${pack.questions.length} questions across Easy, Medium and Hard, with answers and explanations. Use the buttons above to start a focused quiz.` });
+    try { await getBot().api.editMessageText(job.chatId, progressMessage.message_id, `✅ Question set ready: 100%\nGenerated ${pack.questions.length} questions across Easy, Medium and Hard.`); } catch { /* Ignore Telegram edit errors. */ }
     success = true; await ProcessingJob.findOneAndUpdate({ jobId }, { status: 'completed', stage: 'completed', progress: 100, completedAt: new Date() });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR'; const code = message.startsWith('AI_OUTPUT_INVALID') ? 'AI_OUTPUT_INVALID' : message;
