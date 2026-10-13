@@ -7,8 +7,10 @@ export async function beginQuiz(ctx: Context, documentId: string, difficulty: st
     const doc = await StudyDocument.findById(documentId);
     const { User } = await import('../../models/index'); const user = await User.findOne({ telegramUserId: String(ctx.from.id) });
     if (!doc || !user || String(doc.userId) !== String(user._id)) { await ctx.reply('This study pack is not available for your account.'); return; }
+    const availableQuestions = await QuestionSet.findOne({ documentId }).sort({ createdAt: -1 });
+    if (!availableQuestions) { await ctx.reply('⏳ Questions are still being generated for this document. Please tap your quiz mode again in a little while.'); return; }
     const result = await startQuiz(String(user._id), String(ctx.chat.id), documentId, difficulty);
-    await ctx.reply(`📝 ${difficulty.toUpperCase()} QUIZ\n\n${result.question.question}`, { reply_markup: result.keyboard });
+    await ctx.reply(`📝 ${difficulty.toUpperCase()} QUIZ\n\nQuestion 1/${result.session.questionIds.length}\n\n${result.question.question}`, { reply_markup: result.keyboard });
   } catch (e) { await ctx.reply('I could not start that quiz. Please generate a new study pack or choose another difficulty.'); }
 }
 export async function quizCallback(ctx: Context) {
