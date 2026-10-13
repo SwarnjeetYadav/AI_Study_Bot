@@ -1,0 +1,31 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: ["mongo_data:/data/db"]
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis_data:/data"]
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/ai_telegram_study_bot
+      REDIS_URL: redis://redis:6379
+    depends_on: [mongo, redis]
+    command: ["node", "dist/app.js"]
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/ai_telegram_study_bot
+      REDIS_URL: redis://redis:6379
+    depends_on: [mongo, redis]
+    command: ["node", "dist/worker.js"]
+volumes:
+  mongo_data:
+  redis_data:

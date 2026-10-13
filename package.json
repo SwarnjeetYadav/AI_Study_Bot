@@ -1,0 +1,39 @@
+{
+  "name": "ai-telegram-study-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram study bot: PDF/DOCX to grounded summaries, difficulty-based MCQs, PDFs and interactive quizzes.",
+  "main": "dist/app.js",
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "worker": "tsx watch src/worker.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/app.js",
+    "start:worker": "node dist/worker.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": { "node": ">=20.11.0" },
+  "dependencies": {
+    "bullmq": "^5.12.12",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "grammy": "^1.30.0",
+    "ioredis": "^5.4.2",
+    "mammoth": "^1.8.0",
+    "mongoose": "^8.8.0",
+    "openai": "^4.73.1",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.15.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/pdfkit": "^0.13.8",
+    "@types/pdf-parse": "^1.1.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
