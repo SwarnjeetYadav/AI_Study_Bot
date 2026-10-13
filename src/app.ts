@@ -30,7 +30,7 @@ async function main() {
   bot.command('start', startHandler); bot.command('help', help); bot.command('plans', showPlans); bot.command('status', status); bot.command('history', history); bot.command('delete', deleteCommand); bot.command('privacy', privacy); bot.command('terms', terms); bot.command('admin', adminCommand);
   bot.command('new', async ctx => ctx.reply('Upload a PDF or DOCX to start a new study pack.'));
   bot.command('cancel', async ctx => ctx.reply('No interactive cancellation is available at this moment. Queued jobs will be processed; contact support if a job is stuck.'));
-  bot.on('message:document', documentHandler);
+  bot.on('message:document', documentHandler); bot.on('message:photo', documentHandler);
   bot.callbackQuery('consent:accept', async ctx => { const user = await upsertUser(ctx); if (user) { user.acceptedTermsAt = new Date(); await user.save(); } await ctx.answerCallbackQuery({ text: 'Consent saved.' }); await ctx.reply('You’re ready to learn! Upload a PDF or DOCX document.'); });
   bot.callbackQuery(/^quiz:/, quizCallback);
   bot.callbackQuery(/^delete:/, deleteCallback);
