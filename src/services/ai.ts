@@ -54,7 +54,7 @@ export async function createStudyPack(source: string, filename: string, question
             lastError = parsed.error.issues.slice(0, 3).map(i => i.message).join('; ');
             continue;
           }
-          const existingKeys = new Set([...allQuestions, ...batchQuestions].map(q => q.question.toLowerCase().replace(/\\W/g, '')));
+          const existingKeys = new Set([...allQuestions, ...batchQuestions].map(q => q.question.toLowerCase().replace(/\W/g, '')));
           for (const q of parsed.data.questions) {
             const key = q.question.toLowerCase().replace(/\\W/g, '');
             const optionsUnique = !q.options.some((o, i) => q.options.some((other, j) => i !== j && o.text.trim().toLowerCase() === other.text.trim().toLowerCase()));
@@ -72,7 +72,9 @@ export async function createStudyPack(source: string, filename: string, question
       allQuestions.push(...batchQuestions);
       remaining -= batchQuestions.length;
       if (batchQuestions.length === 0) {
-        throw new Error(`NOT_ENOUGH_GROUNDED_QUESTIONS: unable to generate more ${difficulty} questions (${lastError || 'source may not contain enough distinct evidence'})`);
+        // Keep valid questions already generated; do not fail the whole study pack
+        // just because this source cannot support another complete batch.
+        break;
       }
     }
   }
@@ -83,6 +85,6 @@ export async function createStudyPack(source: string, filename: string, question
     seen.add(key);
     return q.sourceEvidence.length >= 8 && source.toLowerCase().includes(q.sourceEvidence.toLowerCase().trim());
   });
-  if (questions.length < total) throw new Error(`NOT_ENOUGH_GROUNDED_QUESTIONS: generated ${questions.length}/${total} validated questions`);
+  if (questions.length < 3) throw new Error(`NOT_ENOUGH_GROUNDED_QUESTIONS: generated only ${questions.length} validated questions; source needs more readable content`);
   return { summary: parsedSummary.data.summary, questions };
 }
