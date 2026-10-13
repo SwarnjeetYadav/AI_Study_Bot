@@ -56,7 +56,7 @@ export async function createStudyPack(source: string, filename: string, question
           }
           const existingKeys = new Set([...allQuestions, ...batchQuestions].map(q => q.question.toLowerCase().replace(/\W/g, '')));
           for (const q of parsed.data.questions) {
-            const key = q.question.toLowerCase().replace(/\\W/g, '');
+            const key = q.question.toLowerCase().replace(/\W/g, '');
             const optionsUnique = !q.options.some((o, i) => q.options.some((other, j) => i !== j && o.text.trim().toLowerCase() === other.text.trim().toLowerCase()));
             const grounded = q.sourceEvidence.length >= 8 && source.toLowerCase().includes(q.sourceEvidence.toLowerCase().trim());
             if (!existingKeys.has(key) && optionsUnique && grounded) {
@@ -86,5 +86,8 @@ export async function createStudyPack(source: string, filename: string, question
     return q.sourceEvidence.length >= 8 && source.toLowerCase().includes(q.sourceEvidence.toLowerCase().trim());
   });
   if (questions.length < 3) throw new Error(`NOT_ENOUGH_GROUNDED_QUESTIONS: generated only ${questions.length} validated questions; source needs more readable content`);
-  return { summary: parsedSummary.data.summary, questions };
+  // IDs from AI responses may restart at q_001 in every batch. Make every stored
+  // question ID unique so Telegram quiz callbacks always resolve the intended item.
+  const questionsWithUniqueIds = questions.map((q, index) => ({ ...q, id: `${q.difficulty}_${String(index + 1).padStart(3, '0')}` }));
+  return { summary: parsedSummary.data.summary, questions: questionsWithUniqueIds };
 }
