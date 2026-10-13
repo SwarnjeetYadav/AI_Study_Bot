@@ -32,6 +32,21 @@ async function main() {
   bot.command('cancel', async ctx => ctx.reply('No interactive cancellation is available at this moment. Queued jobs will be processed; contact support if a job is stuck.'));
   bot.on('message:document', documentHandler);
   bot.callbackQuery('consent:accept', async ctx => { const user = await upsertUser(ctx); if (user) { user.acceptedTermsAt = new Date(); await user.save(); } await ctx.answerCallbackQuery({ text: 'Consent saved.' }); await ctx.reply('You’re ready to learn! Upload a PDF or DOCX file.'); });
+  bot.callbackQuery(/^mode:/, async ctx => {
+    const data = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : '';
+    if (data === 'mode:end') {
+      await ctx.answerCallbackQuery({ text: 'Study session ended.' });
+      await ctx.reply('👋 Study session ended. Upload another PDF/DOCX or use /new whenever you are ready.');
+      return;
+    }
+    const match = /^mode:([a-f\\d]{24}):(easy|medium|hard)$/.exec(data);
+    if (!match || !match[1] || !match[2]) {
+      await ctx.answerCallbackQuery({ text: 'This mode button is invalid.' });
+      return;
+    }
+    await ctx.answerCallbackQuery();
+    await beginQuiz(ctx, match[1], match[2]);
+  });
   bot.callbackQuery(/^quiz:/, quizCallback);
   bot.callbackQuery(/^delete:/, deleteCallback);
   bot.callbackQuery(/^menu:/, menuCallback);
