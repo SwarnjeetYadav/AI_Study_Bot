@@ -55,7 +55,17 @@ async function processDocument(jobId: string) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR'; const code = message.startsWith('AI_OUTPUT_INVALID') ? 'AI_OUTPUT_INVALID' : message;
     await StudyDocument.findByIdAndUpdate(doc._id, { status: 'failed', errorCode: code }); await ProcessingJob.findOneAndUpdate({ jobId }, { status: 'failed', stage: 'failed', errorCode: code });
-    const userMessage = code === 'INSUFFICIENT_TEXT' ? 'I could not extract enough readable text. Please upload a clearer image/document or a PDF with selectable text.' : code === 'PAGE_LIMIT_EXCEEDED' ? `This document exceeds your plan's page limit (${plan.pagesPerDocument}). Use /plans or upload fewer pages.` : code === 'WORD_LIMIT_EXCEEDED' ? 'This document exceeds the configured extracted-text limit. Please upload a shorter document.' : 'Processing failed temporarily. Your document credit will be released. Please try again with a clearer PDF/DOCX.';
+    const userMessage = code === 'INSUFFICIENT_TEXT'
+      ? 'I could not extract enough selectable text from this file. If it is a scanned PDF, please upload a text-based PDF or a DOCX file.'
+      : code === 'PAGE_LIMIT_EXCEEDED'
+        ? `This document exceeds your plan's page limit (${plan.pagesPerDocument}). Use /plans or upload fewer pages.`
+        : code === 'WORD_LIMIT_EXCEEDED'
+          ? 'This document exceeds the configured extracted-text limit. Please upload a shorter document.'
+          : code.includes('XRef') || code.includes('xref') || code.includes('PDF')
+            ? 'I could not read this PDF structure. Please open it in a PDF reader and use Print → Save as PDF, then upload the newly saved file.'
+            : code.startsWith('NOT_ENOUGH_GROUNDED_QUESTIONS')
+              ? 'I could summarize this file, but it did not contain enough distinct source evidence to create all requested questions. Please upload a more detailed PDF/DOCX with selectable text.'
+              : 'Processing failed temporarily. Your document credit will be released. Please try again with a valid PDF/DOCX file.';
     await getBot().api.sendMessage(job.chatId, userMessage);
     throw error;
   } finally {
