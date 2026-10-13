@@ -24,7 +24,7 @@ export async function createSummary(source: string, filename: string): Promise<S
   ));
   const notes = sectionNotes.join('\n');
   const summaryPrompt = `Create a structured study summary grounded ONLY in the source and notes below. Return JSON: {"summary":{"title":"...","overview":"...","sections":[{"heading":"...","keyPoints":["..."]}],"keyTerms":[{"term":"...","definition":"..."}],"revisionPoints":["..."]}}. Preserve the full document's major topics, important definitions, formulas and dates. Do not invent content. NOTES:\n${notes}\nSOURCE (authoritative):\n${source.slice(0, 90000)}`;
-  const summaryJson = suppliedSummary ? { summary: suppliedSummary } : JSON.parse(await ask(summaryPrompt, 5000));
+  const summaryJson = JSON.parse(await ask(summaryPrompt, 5000));
   const SummaryOnlySchema = z.object({ summary: StudyPackSchema.shape.summary });
   const parsedSummary = SummaryOnlySchema.safeParse(summaryJson);
   if (!parsedSummary.success) throw new Error(`AI_SUMMARY_INVALID: ${parsedSummary.error.issues.slice(0, 3).map(i => i.message).join('; ')}`);
