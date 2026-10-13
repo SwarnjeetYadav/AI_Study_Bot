@@ -47,7 +47,13 @@ export async function quizCallback(ctx: Context) {
     await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' });
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     const accuracy = Math.round(updatedSession.score / Math.max(1, updatedSession.answeredCount) * 100);
-    await ctx.reply(`🏁 Quiz completed!\nScore: ${updatedSession.score}/${updatedSession.answeredCount}\nAccuracy: ${accuracy}%\n\nUse the study pack buttons to practise another level.`);
+    const { InlineKeyboard } = await import('grammy');
+    const menu = new InlineKeyboard()
+      .text('Easy Quiz', `mode:${updatedSession.documentId}:easy`)
+      .text('Medium Quiz', `mode:${updatedSession.documentId}:medium`).row()
+      .text('Hard Quiz', `mode:${updatedSession.documentId}:hard`).row()
+      .text('End study session', 'mode:end');
+    await ctx.reply(`🏁 Quiz completed!\nScore: ${updatedSession.score}/${updatedSession.answeredCount}\nAccuracy: ${accuracy}%\n\nChoose another difficulty or end your study session.`, { reply_markup: menu });
     return;
   }
   await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' });
