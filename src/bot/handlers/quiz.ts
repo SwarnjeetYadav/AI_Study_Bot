@@ -60,5 +60,5 @@ export async function quizCallback(ctx: Context) {
   const answerText = q.options.find((o:any) => o.id === q.correctOptionId)?.text ?? '';
   await ctx.reply(`${correct ? '✅ Correct!' : '❌ Not quite.'}\nCorrect answer: ${q.correctOptionId}) ${answerText}\nWhy: ${q.explanation}${q.sourceSection ? `\nSource: ${q.sourceSection}` : ''}`);
   const next = await findQuestion(updatedSession, nextId); if (!next) { await ctx.reply('I could not load the next question. Please restart this quiz.'); return; }
-  await ctx.reply(`Question ${session.currentIndex + 1}/${session.questionIds.length}\n\n${next.question}`, { reply_markup: answerKeyboard(String(updatedSession._id), next.id, next.options) });
+  await ctx.reply(`Question ${updatedSession.currentIndex + 1}/${updatedSession.questionIds.length}\n\n${next.question}`, { reply_markup: answerKeyboard(String(updatedSession._id), next.id, next.options) });
 }
