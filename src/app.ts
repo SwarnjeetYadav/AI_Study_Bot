@@ -11,6 +11,22 @@ import { StudyDocument } from './models';
 async function main() {
   await mongoose.connect(env.mongoUri());
   const bot = getBot();
+
+  // Telegram displays these commands as suggestions when users type "/" in chat.
+  // Keep this public list aligned with commands registered below; admin is intentionally hidden.
+  await bot.api.setMyCommands([
+    { command: 'start', description: 'Start the bot and review consent' },
+    { command: 'help', description: 'How to use AI Study Bot' },
+    { command: 'new', description: 'Start a new study pack' },
+    { command: 'plans', description: 'View plans and document limits' },
+    { command: 'status', description: 'Check your plan and remaining credits' },
+    { command: 'history', description: 'View your recent study packs' },
+    { command: 'delete', description: 'Delete a study pack and its results' },
+    { command: 'cancel', description: 'View cancellation and queue guidance' },
+    { command: 'privacy', description: 'Read the privacy summary' },
+    { command: 'terms', description: 'Read the terms of use' },
+  ]);
+
   bot.command('start', startHandler); bot.command('help', help); bot.command('plans', showPlans); bot.command('status', status); bot.command('history', history); bot.command('delete', deleteCommand); bot.command('privacy', privacy); bot.command('terms', terms); bot.command('admin', adminCommand);
   bot.command('new', async ctx => ctx.reply('Upload a PDF or DOCX to start a new study pack.'));
   bot.command('cancel', async ctx => ctx.reply('No interactive cancellation is available at this moment. Queued jobs will be processed; contact support if a job is stuck.'));
