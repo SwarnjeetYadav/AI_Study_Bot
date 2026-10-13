@@ -7,8 +7,7 @@ import { enqueueDocument } from '../../services/queue';
 import { reserveDocumentQuota, settleDocumentQuota } from '../../services/usage';
 import { upsertUser } from './start';
 
-const allowedExtensions = new Set(['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.webp']);
-const imageMimeTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+const allowedExtensions = new Set(['.pdf', '.docx']);
 
 export async function documentHandler(ctx: Context) {
   const message = ctx.message;
@@ -19,34 +18,23 @@ export async function documentHandler(ctx: Context) {
   let mimeType: string | undefined;
   let fileSize: number | undefined;
 
-  if ('document' in message && message.document) {
-    const file = message.document;
-    name = file.file_name ?? 'upload';
-    const ext = path.extname(name).toLowerCase();
-    mimeType = file.mime_type;
-    if (!allowedExtensions.has(ext)) {
-      await ctx.reply('Please upload a PDF, DOCX, PNG, JPG/JPEG or WEBP image.');
-      return;
-    }
-    fileId = file.file_id;
-    fileSize = file.file_size;
-  
-} else if ('photo' in message && message.photo?.length) {
-  const photo = message.photo[message.photo.length - 1];
-
-  if (!photo) {
-    await ctx.reply('I could not read that image. Please upload it again.');
+  if ('photo' in message && message.photo?.length) {
+    await ctx.reply('Image uploads are temporarily disabled. Please upload your study material as a PDF or DOCX file.');
     return;
   }
 
-  fileId = photo.file_id;
-  name = `image-${Date.now()}.jpg`;
-  mimeType = 'image/jpeg';
-  fileSize = photo.file_size;
-}
- else {
+  if (!('document' in message) || !message.document) return;
+
+  const file = message.document;
+  name = file.file_name ?? 'upload';
+  const ext = path.extname(name).toLowerCase();
+  mimeType = file.mime_type;
+  if (!allowedExtensions.has(ext)) {
+    await ctx.reply('Unsupported file type. Please upload only a PDF or DOCX file.');
     return;
   }
+  fileId = file.file_id;
+  fileSize = file.file_size;
 
   if (fileSize && fileSize > env.maxUploadBytes) {
     await ctx.reply(`This file is too large. Current upload limit is ${Math.round(env.maxUploadBytes / 1_000_000)} MB.`);
@@ -60,7 +48,7 @@ export async function documentHandler(ctx: Context) {
   catch (e) { if (e instanceof Error && e.message === 'QUOTA_EXCEEDED') { await ctx.reply('You have used all 5 document credits for this month on the Free plan. Use /plans to compare plans.'); return; } throw e; }
 
   const jobId = crypto.randomUUID();
-  const saved = await StudyDocument.create({ userId: user._id, telegramFileId: fileId, originalName: name, mimeType: mimeType ?? imageMimeTypes[path.extname(name).toLowerCase()], sizeBytes: fileSize, status: 'queued', retentionUntil: new Date(Date.now() + 7 * 86400000) });
+  const saved = await StudyDocument.create({ userId: user._id, telegramFileId: fileId, originalName: name, mimeType, sizeBytes: fileSize, status: 'queued', retentionUntil: new Date(Date.now() + 7 * 86400000) });
   const progress = await ctx.reply(`📄 Received: ${name}\n⏳ Queued for processing. I’ll send your summary, practice PDF and quiz buttons when ready.`);
   await ProcessingJob.create({ jobId, userId: user._id, documentId: saved._id, chatId: String(ctx.chat.id), stage: 'queued', progress: 0, status: 'queued', progressMessageId: progress.message_id, periodKey });
   try { await enqueueDocument({ jobId }); }
