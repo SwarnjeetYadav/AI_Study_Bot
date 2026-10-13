@@ -26,13 +26,33 @@ export async function quizCallback(ctx: Context) {
   const q = await findQuestion(session, questionId);
   if (!q || session.questionIds[session.currentIndex] !== questionId) { await ctx.answerCallbackQuery({ text: 'This question is no longer active.' }); return; }
   const correct = selected === q.correctOptionId;
-  session.answers.push({ questionId, selectedOptionId: selected, isCorrect: correct, answeredAt: new Date() });
-  session.answeredCount += 1; if (correct) session.score += 1; session.currentIndex += 1;
-  const nextId = session.questionIds[session.currentIndex];
-  if (!nextId) { session.status = 'completed'; session.endedAt = new Date(); await session.save(); await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' }); await ctx.editMessageReplyMarkup({ reply_markup: undefined }); const accuracy = Math.round(session.score / Math.max(1, session.answeredCount) * 100); await ctx.reply(`🏁 Quiz completed!\nScore: ${session.score}/${session.answeredCount}\nAccuracy: ${accuracy}%\n\nUse the study pack buttons to practise another level.`); return; }
-  await session.save(); await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' });
+  // Atomically advance only if this callback still targets the active question.
+  // Telegram can deliver duplicate/rapid callbacks; a normal read-modify-save can skip questions.
+  const update = await QuizSession.updateOne(
+    { _id: session._id, status: 'active', currentIndex: session.currentIndex, 'answers.questionId': { $ne: questionId } },
+    {
+      $push: { answers: { questionId, selectedOptionId: selected, isCorrect: correct, answeredAt: new Date() } },
+      $inc: { answeredCount: 1, currentIndex: 1, ...(correct ? { score: 1 } : {}) }
+    }
+  );
+  if (update.modifiedCount !== 1) {
+    await ctx.answerCallbackQuery({ text: 'This question was already answered or is no longer active.' });
+    return;
+  }
+  const updatedSession = await QuizSession.findById(session._id);
+  if (!updatedSession) { await ctx.answerCallbackQuery({ text: 'This quiz has expired.' }); return; }
+  const nextId = updatedSession.questionIds[updatedSession.currentIndex];
+  if (!nextId) {
+    updatedSession.status = 'completed'; updatedSession.endedAt = new Date(); await updatedSession.save();
+    await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' });
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+    const accuracy = Math.round(updatedSession.score / Math.max(1, updatedSession.answeredCount) * 100);
+    await ctx.reply(`🏁 Quiz completed!\nScore: ${updatedSession.score}/${updatedSession.answeredCount}\nAccuracy: ${accuracy}%\n\nUse the study pack buttons to practise another level.`);
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: correct ? 'Correct!' : 'Answer recorded.' });
   const answerText = q.options.find((o:any) => o.id === q.correctOptionId)?.text ?? '';
   await ctx.reply(`${correct ? '✅ Correct!' : '❌ Not quite.'}\nCorrect answer: ${q.correctOptionId}) ${answerText}\nWhy: ${q.explanation}${q.sourceSection ? `\nSource: ${q.sourceSection}` : ''}`);
-  const next = await findQuestion(session, nextId); if (!next) return;
-  await ctx.reply(`Question ${session.currentIndex + 1}/${session.questionIds.length}\n\n${next.question}`, { reply_markup: answerKeyboard(String(session._id), next.id, next.options) });
+  const next = await findQuestion(updatedSession, nextId); if (!next) { await ctx.reply('I could not load the next question. Please restart this quiz.'); return; }
+  await ctx.reply(`Question ${session.currentIndex + 1}/${session.questionIds.length}\n\n${next.question}`, { reply_markup: answerKeyboard(String(updatedSession._id), next.id, next.options) });
 }
