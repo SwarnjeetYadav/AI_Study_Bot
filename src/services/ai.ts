@@ -31,7 +31,7 @@ export async function createSummary(source: string, filename: string): Promise<S
   return parsedSummary.data.summary;
 }
 
-export async function createStudyPack(source: string, filename: string, questionsPerDifficulty: number, suppliedSummary?: StudyPack['summary']): Promise<StudyPack> {
+export async function createStudyPack(source: string, filename: string, questionsPerDifficulty: number, suppliedSummary?: StudyPack['summary'], onProgress?: (completedDifficulties: number, totalDifficulties: number, difficulty: string) => Promise<void> | void): Promise<StudyPack> {
   const parts = chunks(source);
   // Summarize chunks concurrently to avoid waiting for one model call per chunk.
   const sectionNotes = await Promise.all(parts.map((part, i) =>
@@ -50,6 +50,7 @@ export async function createStudyPack(source: string, filename: string, question
   const allQuestions: z.infer<typeof QuestionSchema>[] = [];
   const acceptedQuestionKeys = new Set<string>();
   const QuestionBatchSchema = z.object({ questions: z.array(QuestionSchema) });
+  let completedDifficulties = 0;
   await Promise.all((['easy', 'medium', 'hard'] as const).map(async difficulty => {
     let remaining = counts[difficulty];
     while (remaining > 0) {
@@ -94,6 +95,8 @@ export async function createStudyPack(source: string, filename: string, question
         break;
       }
     }
+    completedDifficulties += 1;
+    await onProgress?.(completedDifficulties, 3, difficulty);
   }));
   const seen = new Set<string>();
   const questions = allQuestions.filter(q => {
