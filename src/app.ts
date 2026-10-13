@@ -64,7 +64,12 @@ async function main() {
     await ctx.answerCallbackQuery({ text: 'Preparing your question PDF.' });
     const out = path.join(env.tempDir, `questions-${crypto.randomUUID()}.pdf`);
     try {
-      await renderStudyPdf({ summary: doc.summary, questions: set.questions } as any, doc.originalName, out);
+      const mixedQuestions = [...set.questions] as any[];
+      for (let i = mixedQuestions.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(i + 1);
+        const temp = mixedQuestions[i]; mixedQuestions[i] = mixedQuestions[j]!; mixedQuestions[j] = temp!;
+      }
+      await renderStudyPdf({ summary: doc.summary, questions: mixedQuestions } as any, doc.originalName, out);
       await ctx.api.sendDocument(ctx.chat.id, new InputFile(out, `${path.parse(doc.originalName).name}-question-set.pdf`), { caption: 'Complete question set with answers and explanations.' });
     } finally { await fs.rm(out, { force: true }).catch(() => {}); }
   });
